@@ -1,0 +1,394 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123d32">
+<title>NZM KASIR</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f2f5f3;color:#172b24;font-family:Arial,sans-serif}
+header{background:#123d32;color:white;padding:20px}
+header h2{margin:0}
+nav{display:flex;background:white;overflow:auto;position:sticky;top:0}
+nav button{flex:1;min-width:70px;border:0;background:white;padding:14px 5px}
+nav button.active{color:#13734e;border-bottom:3px solid #13734e;font-weight:bold}
+main{padding:14px;max-width:700px;margin:auto}
+.card{background:white;padding:16px;border-radius:13px;margin-bottom:13px}
+h3{margin:0 0 12px}
+input{width:100%;padding:12px;border:1px solid #d5dfd9;border-radius:8px;margin:5px 0 12px;font-size:15px}
+.action{background:#176b4c;color:white;border:0;padding:12px 15px;border-radius:8px;font-weight:bold}
+.danger{background:#a83232;color:white;border:0;padding:8px;border-radius:7px}
+.light{background:#e8f1ec;color:#176b4c;border:0;padding:9px;border-radius:7px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{font-size:22px;font-weight:bold;margin-top:7px}
+.muted{color:#718078;font-size:13px}
+.item{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid #edf0ed}
+.hidden{display:none!important}
+#lock{position:fixed;inset:0;background:#123d32;z-index:10;display:flex;align-items:center;justify-content:center;padding:25px}
+#lock .card{width:100%;max-width:350px;text-align:center}
+.total{font-size:24px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div id="lock">
+<div class="card">
+<h2>NZM KASIR</h2>
+<p class="muted">Masukkan PIN untuk membuka aplikasi</p>
+<input id="pinInput" type="password" inputmode="numeric" placeholder="PIN">
+<button class="action" style="width:100%" onclick="unlock()">MASUK</button>
+<p id="pinError" style="color:red"></p>
+<small class="muted">PIN awal: 1234</small>
+</div>
+</div>
+
+<header>
+<h2>NZM KASIR</h2>
+<small>PUSAT OLEH-OLEH HAJI & UMRAH</small>
+</header>
+
+<nav>
+<button class="active" onclick="page('home',this)">Beranda</button>
+<button onclick="page('kasir',this)">Kasir</button>
+<button onclick="page('produk',this)">Produk</button>
+<button onclick="page('riwayat',this)">Riwayat</button>
+<button onclick="page('pengaturan',this)">Pengaturan</button>
+</nav>
+
+<main>
+
+<section id="home">
+<div class="grid">
+<div class="card">
+<div class="muted">Penjualan hari ini</div>
+<div class="stat" id="todaySales">Rp0</div>
+</div>
+<div class="card">
+<div class="muted">Transaksi hari ini</div>
+<div class="stat" id="todayCount">0</div>
+</div>
+<div class="card">
+<div class="muted">Jumlah produk</div>
+<div class="stat" id="productCount">0</div>
+</div>
+<div class="card">
+<div class="muted">Total stok</div>
+<div class="stat" id="stockCount">0</div>
+</div>
+</div>
+<div class="card">
+<h3>Selamat Datang</h3>
+<p class="muted">Kelola produk, stok, harga dan transaksi Nizam Makmur.</p>
+</div>
+</section>
+
+<section id="kasir" class="hidden">
+<div class="card">
+<h3>Transaksi Penjualan</h3>
+<input id="searchProduct" placeholder="Cari nama produk..." oninput="renderSell()">
+<div id="sellList"></div>
+</div>
+<div class="card">
+<h3>Keranjang</h3>
+<div id="cartList"></div>
+<p class="total" id="cartTotal">Rp0</p>
+<input id="paid" type="number" placeholder="Uang diterima">
+<button class="action" style="width:100%" onclick="checkout()">PROSES PEMBAYARAN</button>
+</div>
+</section>
+
+<section id="produk" class="hidden">
+<div class="card">
+<h3>Tambah / Edit Produk</h3>
+<input id="pname" placeholder="Nama produk">
+<input id="pprice" type="number" placeholder="Harga jual (Rp)">
+<input id="pstock" type="number" placeholder="Jumlah stok">
+<button class="action" onclick="saveProduct()">SIMPAN PRODUK</button>
+<button class="light" onclick="clearForm()">BATAL EDIT</button>
+</div>
+<div class="card">
+<h3>Daftar Produk</h3>
+<div id="productList"></div>
+</div>
+</section>
+
+<section id="riwayat" class="hidden">
+<div class="card">
+<h3>Riwayat Transaksi</h3>
+<div id="historyList"></div>
+</div>
+</section>
+
+<section id="pengaturan" class="hidden">
+<div class="card">
+<h3>Keamanan</h3>
+<input id="newPin" type="password" placeholder="PIN baru minimal 4 angka">
+<button class="action" onclick="changePin()">GANTI PIN</button>
+</div>
+<div class="card">
+<h3>Cadangan Data</h3>
+<p class="muted">Simpan cadangan data secara berkala.</p>
+<button class="light" onclick="exportData()">CADANGKAN DATA</button>
+<input type="file" id="importFile" accept=".json">
+<button class="action" onclick="importData()">PULIHKAN DATA</button>
+</div>
+</section>
+
+</main>
+
+<script>
+const get=(k,d)=>{
+try{return JSON.parse(localStorage.getItem(k))??d}
+catch(e){return d}
+};
+
+let products=get('nzm_products',[]);
+let sales=get('nzm_sales',[]);
+let cart=[];
+let pin=localStorage.getItem('nzm_pin')||'1234';
+let editing=null;
+
+const rupiah=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
+
+const save=()=>{
+localStorage.setItem('nzm_products',JSON.stringify(products));
+localStorage.setItem('nzm_sales',JSON.stringify(sales));
+};
+
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({
+'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+}[c]));
+
+function unlock(){
+if(document.getElementById('pinInput').value===pin){
+document.getElementById('lock').classList.add('hidden');
+refresh();
+}else{
+document.getElementById('pinError').textContent='PIN salah.';
+}
+}
+
+function page(id,btn){
+document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+document.getElementById(id).classList.remove('hidden');
+document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+refresh();
+}
+
+function refresh(){
+dashboard();
+renderProducts();
+renderSell();
+renderCart();
+renderHistory();
+}
+
+function dashboard(){
+let today=new Date().toLocaleDateString('id-ID');
+let list=sales.filter(s=>new Date(s.date).toLocaleDateString('id-ID')===today);
+document.getElementById('todaySales').textContent=rupiah(list.reduce((a,b)=>a+b.total,0));
+document.getElementById('todayCount').textContent=list.length;
+document.getElementById('productCount').textContent=products.length;
+document.getElementById('stockCount').textContent=products.reduce((a,b)=>a+Number(b.stock),0);
+}
+
+function saveProduct(){
+let name=document.getElementById('pname').value.trim();
+let price=Number(document.getElementById('pprice').value);
+let stock=Number(document.getElementById('pstock').value);
+
+if(!name||document.getElementById('pprice').value===''||
+document.getElementById('pstock').value===''||price<0||stock<0){
+alert('Lengkapi nama, harga dan stok.');
+return;
+}
+
+if(editing!==null){
+products[editing]={name,price,stock};
+editing=null;
+}else{
+products.push({name,price,stock});
+}
+
+save();
+clearForm();
+refresh();
+}
+
+function clearForm(){
+editing=null;
+document.getElementById('pname').value='';
+document.getElementById('pprice').value='';
+document.getElementById('pstock').value='';
+}
+
+function renderProducts(){
+document.getElementById('productList').innerHTML=
+products.map((p,i)=>`
+<div class="item">
+<div><b>${esc(p.name)}</b><br>
+${rupiah(p.price)}<br>
+<small class="muted">Stok: ${p.stock}</small></div>
+<div>
+<button class="light" onclick="editProduct(${i})">Edit</button>
+<button class="danger" onclick="deleteProduct(${i})">Hapus</button>
+</div>
+</div>`).join('')||'<p class="muted">Belum ada produk.</p>';
+}
+
+function editProduct(i){
+editing=i;
+let p=products[i];
+document.getElementById('pname').value=p.name;
+document.getElementById('pprice').value=p.price;
+document.getElementById('pstock').value=p.stock;
+window.scrollTo(0,0);
+}
+
+function deleteProduct(i){
+if(confirm('Hapus produk ini?')){
+products.splice(i,1);
+save();
+refresh();
+}
+}
+
+function renderSell(){
+let q=document.getElementById('searchProduct').value.toLowerCase();
+document.getElementById('sellList').innerHTML=
+products.map((p,i)=>({p,i}))
+.filter(x=>x.p.name.toLowerCase().includes(q)&&x.p.stock>0)
+.map(({p,i})=>`
+<div class="item">
+<div><b>${esc(p.name)}</b><br>
+${rupiah(p.price)} <small class="muted">Stok ${p.stock}</small></div>
+<button class="action" onclick="addCart(${i})">Tambah</button>
+</div>`).join('')||'<p class="muted">Produk tidak ditemukan atau stok kosong.</p>';
+}
+
+function addCart(i){
+let f=cart.find(x=>x.i===i);
+if(f){
+if(f.qty>=products[i].stock)return alert('Stok tidak cukup');
+f.qty++;
+}else{
+cart.push({i,qty:1});
+}
+renderCart();
+}
+
+function renderCart(){
+document.getElementById('cartList').innerHTML=
+cart.map((x,j)=>`
+<div class="item">
+<div>${esc(products[x.i]?.name||'Produk')}<br>
+${rupiah(products[x.i]?.price)} × ${x.qty}</div>
+<div>
+<button class="light" onclick="qtyChange(${j},-1)">−</button>
+<button class="light" onclick="qtyChange(${j},1)">+</button>
+<button class="danger" onclick="removeCart(${j})">×</button>
+</div>
+</div>`).join('')||'<p class="muted">Keranjang masih kosong.</p>';
+
+document.getElementById('cartTotal').textContent=
+rupiah(cart.reduce((a,x)=>a+(products[x.i]?.price||0)*x.qty,0));
+}
+
+function removeCart(j){
+cart.splice(j,1);
+renderCart();
+}
+
+function qtyChange(j,n){
+let x=cart[j];
+if(n>0&&x.qty>=products[x.i].stock)return alert('Stok tidak cukup');
+x.qty+=n;
+if(x.qty<=0)cart.splice(j,1);
+renderCart();
+}
+
+function checkout(){
+if(!cart.length)return alert('Keranjang masih kosong.');
+
+let total=cart.reduce((a,x)=>a+products[x.i].price*x.qty,0);
+let paid=Number(document.getElementById('paid').value);
+
+if(!paid||paid<total)return alert('Uang diterima kurang dari total belanja.');
+
+let items=cart.map(x=>({
+name:products[x.i].name,
+price:products[x.i].price,
+qty:x.qty
+}));
+
+cart.forEach(x=>products[x.i].stock-=x.qty);
+
+sales.unshift({
+date:new Date().toISOString(),
+items,total,paid,change:paid-total
+});
+
+cart=[];
+document.getElementById('paid').value='';
+save();
+refresh();
+alert('Transaksi berhasil. Kembalian: '+rupiah(paid-total));
+}
+
+function renderHistory(){
+document.getElementById('historyList').innerHTML=
+sales.map(s=>`
+<div class="item">
+<div><b>${new Date(s.date).toLocaleString('id-ID')}</b><br>
+${s.items.map(x=>esc(x.name)+' × '+x.qty).join(', ')}<br>
+<small class="muted">Bayar ${rupiah(s.paid)} · Kembali ${rupiah(s.change)}</small>
+</div>
+<b>${rupiah(s.total)}</b>
+</div>`).join('')||'<p class="muted">Belum ada transaksi.</p>';
+}
+
+function changePin(){
+let p=document.getElementById('newPin').value;
+if(!/^\d{4,}$/.test(p))return alert('PIN minimal 4 angka.');
+pin=p;
+localStorage.setItem('nzm_pin',pin);
+document.getElementById('newPin').value='';
+alert('PIN berhasil diganti.');
+}
+
+function exportData(){
+let blob=new Blob([JSON.stringify({products,sales},null,2)],{type:'application/json'});
+let a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download='cadangan-nzm-kasir.json';
+a.click();
+URL.revokeObjectURL(a.href);
+}
+
+function importData(){
+let f=document.getElementById('importFile').files[0];
+if(!f)return alert('Pilih file cadangan terlebih dahulu.');
+
+let r=new FileReader();
+r.onload=()=>{
+try{
+let d=JSON.parse(r.result);
+if(!Array.isArray(d.products)||!Array.isArray(d.sales))throw Error();
+products=d.products;
+sales=d.sales;
+save();
+refresh();
+alert('Data berhasil dipulihkan.');
+}catch(e){
+alert('File cadangan tidak valid.');
+}
+};
+r.readAsText(f);
+}
+</script>
+</body>
+  </html>
+  
